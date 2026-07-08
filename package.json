@@ -7,9 +7,12 @@
   "scripts": {
     "dev": "bun run scripts/build.ts --watch",
     "build": "bun run scripts/build.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pretest": "bun run build",
+    "test": "playwright test"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@playwright/test": "^1.61.1",
     "@types/bun": "latest",
     "@types/chrome": "^0.2.2",
