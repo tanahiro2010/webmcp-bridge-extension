@@ -370,6 +370,13 @@ async function currentManifest(): Promise<WebMcpToolManifestDraft[]> {
 
 let lastReportedIds = "";
 async function reportManifestIfChanged(): Promise<void> {
+  // Bail out *before* touching lastReportedIds if we can't actually deliver yet (handshake
+  // not done). Otherwise a toolchange firing early - e.g. a declarative-only page whose form
+  // gets picked up by the MutationObserver before content.ts's handshake round-trip lands -
+  // would mark the current tool set as "already reported" without ever having sent it, and
+  // the handshake's own reportManifestIfChanged() call would then see no diff and stay silent
+  // forever: the overlay would never appear for that page.
+  if (!CHANNEL) return;
   const tools = await currentManifest();
   const idsKey = tools
     .map((t) => t.id)
