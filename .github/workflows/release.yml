@@ -28,7 +28,10 @@ jobs:
       - name: Build extension
         run: bun run build
 
+      - name: Zip files
+        run: zip -r extension.zip ./dist
+
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/*"
+          artifacts: "extension.zip"
