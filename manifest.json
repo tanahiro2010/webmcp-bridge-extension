@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WebMCP Bridge",
-  "version": "0.1.4",
+  "version": "0.1.0",
   "description": "Connects Chrome to the webmcp-bridge-mcp server so MCP clients can drive WebMCP tools on the active page.",
   "background": {
     "service_worker": "background.js"
