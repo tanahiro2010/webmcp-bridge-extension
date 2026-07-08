@@ -127,6 +127,35 @@ form.addEventListener("submit", (event) => {
 宣言型 (`search_hotels`) 両方のサンプル tool を含むページがあります。`bun run build` 後は
 `dist/examples/webmcp-sample.html` として同梱されるので、そのファイルを Chrome で直接開いて確認できます。
 
+## テスト（Playwright）
+
+```bash
+bun run test
+```
+
+（初回のみ `bunx playwright install chromium` でブラウザ本体を取得してください。）
+
+`bun run build` → 実際に拡張機能を読み込んだ Chromium を起動 → [webmcp-bridge-mcp](../webmcp-bridge-mcp)
+の実サーバーを子プロセスとして起動 → 実際の MCP `Client`（Antigravity CLI のようなエージェントの代わりに
+スクリプトで直接叩く「モックされたエージェント」）で `webmcp_discover_tools` / `webmcp_call_tool` を呼ぶ、
+という一連の流れをテストごとに実行します。手動検証で使ったシナリオをそのまま自動化しており、
+`tests/fixtures/` の4ページに対応しています。
+
+| テストファイル | 検証内容 |
+| --- | --- |
+| `tests/fixtures/imperative-only.html` | 命令型のみ（`<form>` 無し） |
+| `tests/fixtures/declarative-only.html` | 宣言型のみ（`registerTool()` 呼び出し無し） |
+| `tests/fixtures/mixed.html` | 命令型・宣言型が普通に混在 |
+| `tests/fixtures/dynamic-interaction.html` | `unlock` 実行で新しい命令型 tool と宣言型フォームが動的に出現し、`lock` で消える |
+
+**Chrome 本体ではなく Playwright 付属の Chromium を使う理由:** Chrome 137 以降、正規ビルドの
+Google Chrome は自動化目的の `--load-extension` フラグを廃止しています（[README トップの実機検証の節](#chromeへの読み込み方法)
+参照）。Playwright がインストールする Chromium（≒ Chrome for Testing 相当）はこの制限を受けないため、
+拡張機能を自動テストで読み込めます。MV3 拡張機能はヘッドレスでは不安定なため、
+`playwright.config.ts` では `headless: false` を指定しています（CI で動かす場合は仮想ディスプレイ
+（`xvfb-run` など）が必要です）。各テストが固定ポート `8787` で MCP サーバーを個別に起動するため、
+`playwright.config.ts` は `workers: 1` で直列実行しています。
+
 ## 実機検証で分かったこと
 
 Chrome for Testing 上で実際にこの拡張機能を読み込み、サンプルページに対して
