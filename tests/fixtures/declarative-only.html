@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Declarative Only Fixture</title>
+  </head>
+  <body>
+    <h1>Declarative-only WebMCP tool (no document.modelContext.registerTool call anywhere)</h1>
+    <form toolname="decl_only" tooldescription="Declarative-only tool: echoes a word" toolautosubmit>
+      <input name="word" toolparamdescription="a word to echo" required />
+      <button type="submit">Go</button>
+    </form>
+    <script>
+      document.querySelector('form[toolname="decl_only"]').addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (!event.agentInvoked) return;
+        const word = new FormData(event.target).get("word");
+        event.respondWith(Promise.resolve({ ok: true, echo: word }));
+      });
+    </script>
+  </body>
+</html>

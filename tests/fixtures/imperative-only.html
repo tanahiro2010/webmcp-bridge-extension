@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Imperative Only Fixture</title>
+  </head>
+  <body>
+    <h1>Imperative-only WebMCP tool (no forms anywhere on this page)</h1>
+    <script>
+      document.modelContext.registerTool({
+        name: "imp_only",
+        description: "Imperative-only tool: doubles a number",
+        inputSchema: { type: "object", properties: { n: { type: "number" } }, required: ["n"] },
+        execute: async ({ n }) => ({ ok: true, doubled: n * 2 }),
+      });
+    </script>
+  </body>
+</html>

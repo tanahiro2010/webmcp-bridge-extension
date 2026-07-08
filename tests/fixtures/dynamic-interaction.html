@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dynamic Interaction Fixture</title>
+  </head>
+  <body>
+    <h1>Calling "unlock" reveals a new imperative tool and a new declarative form; "lock" hides them again</h1>
+    <div id="secret-container"></div>
+    <script>
+      let secretController = null;
+
+      document.modelContext.registerTool({
+        name: "unlock",
+        description: "Reveals secret_imperative and secret_form",
+        inputSchema: { type: "object", properties: {} },
+        execute: async () => {
+          secretController = new AbortController();
+          await document.modelContext.registerTool(
+            {
+              name: "secret_imperative",
+              description: "Only available after calling unlock",
+              inputSchema: { type: "object", properties: {} },
+              execute: async () => ({ ok: true, secret: 42 }),
+            },
+            { signal: secretController.signal },
+          );
+
+          const form = document.createElement("form");
+          form.setAttribute("toolname", "secret_form");
+          form.setAttribute("tooldescription", "Only available after calling unlock");
+          form.setAttribute("toolautosubmit", "");
+          const input = document.createElement("input");
+          input.name = "q";
+          input.setAttribute("toolparamdescription", "secret query");
+          input.required = true;
+          const btn = document.createElement("button");
+          btn.type = "submit";
+          btn.textContent = "Go";
+          form.appendChild(input);
+          form.appendChild(btn);
+          form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            if (!event.agentInvoked) return;
+            const q = new FormData(event.target).get("q");
+            event.respondWith(Promise.resolve({ ok: true, secretQuery: q }));
+          });
+          document.getElementById("secret-container").appendChild(form);
+
+          return { ok: true, unlocked: true };
+        },
+      });
+
+      document.modelContext.registerTool({
+        name: "lock",
+        description: "Hides secret_imperative and secret_form again",
+        inputSchema: { type: "object", properties: {} },
+        execute: async () => {
+          secretController?.abort();
+          document.getElementById("secret-container").replaceChildren();
+          return { ok: true, locked: true };
+        },
+      });
+    </script>
+  </body>
+</html>

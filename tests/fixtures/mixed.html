@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mixed Fixture</title>
+  </head>
+  <body>
+    <h1>Imperative and declarative tools coexisting normally on one page</h1>
+
+    <script>
+      document.modelContext.registerTool({
+        name: "imp_tool",
+        description: "Imperative tool: doubles a number",
+        inputSchema: { type: "object", properties: { n: { type: "number" } }, required: ["n"] },
+        execute: async ({ n }) => ({ ok: true, doubled: n * 2 }),
+      });
+    </script>
+
+    <form toolname="decl_tool" tooldescription="Declarative tool: echoes a word" toolautosubmit>
+      <input name="word" toolparamdescription="a word to echo" required />
+      <button type="submit">Go</button>
+    </form>
+    <script>
+      document.querySelector('form[toolname="decl_tool"]').addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (!event.agentInvoked) return;
+        const word = new FormData(event.target).get("word");
+        event.respondWith(Promise.resolve({ ok: true, echo: word }));
+      });
+    </script>
+  </body>
+</html>
