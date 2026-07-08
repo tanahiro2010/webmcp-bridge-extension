@@ -126,13 +126,21 @@ function handleInjectedMessage(event: MessageEvent): void {
   }
 }
 
+// A declarative (annotated-form) tool without toolautosubmit waits for an actual human to
+// click the submit button - at least one native browser implementation blocks
+// executeTool() for that whole wait rather than returning a "pending" status immediately
+// like our own polyfill does (see injected.ts). This needs to comfortably exceed the MCP
+// server's own default tool/call timeout (see webmcp-bridge-mcp/src/mcp/tools.ts) rather
+// than cut the wait short on our end first.
+const TOOL_CALL_TIMEOUT_MS = 60_000;
+
 function callInjectedTool(toolId: string, args: Record<string, unknown> | undefined): Promise<WebMcpCallResponseMessage> {
   const requestId = crypto.randomUUID();
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       pendingCalls.delete(requestId);
       resolve({ ok: false, error: "TOOL_CALL_TIMEOUT" });
-    }, 15_000);
+    }, TOOL_CALL_TIMEOUT_MS);
     pendingCalls.set(requestId, { resolve, timer });
 
     const message: ContentCallMessage = {
