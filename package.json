@@ -1,0 +1,17 @@
+{
+  "name": "webmcp-bridge-extension",
+  "version": "0.1.0",
+  "description": "MV3 Chrome extension that connects to webmcp-bridge-mcp over WebSocket, detects WebMCP tools on the active page, and executes them on request.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run scripts/build.ts --watch",
+    "build": "bun run scripts/build.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/chrome": "^0.2.2",
+    "typescript": "^5.7.0"
+  }
+}
