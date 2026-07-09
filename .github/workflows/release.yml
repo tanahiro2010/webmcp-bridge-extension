@@ -29,7 +29,7 @@ jobs:
         run: bun run build
 
       - name: Zip files
-        run: zip -r extension.zip ./dist
+        run: zip -r extension.zip ./dist/*
 
       - name: Create release
         uses: ncipollo/release-action@v1
