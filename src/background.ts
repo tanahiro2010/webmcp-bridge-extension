@@ -16,7 +16,9 @@ import type {
 // and routes bridge requests to the right tab's content script. Never touches the
 // DOM itself - that's content.ts/injected.ts's job.
 
-const WS_URL = "ws://127.0.0.1:8787";
+// Must match webmcp-bridge-mcp's own default WS_PORT (see that project's src/index.ts) -
+// deliberately not 8787, which collides with `wrangler dev`'s default port.
+const WS_URL = "ws://127.0.0.1:58787";
 const RECONNECT_DELAY_MS = 3_000;
 
 let socket: WebSocket | null = null;
@@ -70,6 +72,15 @@ function connect(): void {
   ws.addEventListener("open", () => {
     log("connected to webmcp-bridge-mcp");
     sendEvent("extension/hello", { version: chrome.runtime.getManifest().version });
+    // The server wipes its whole TabRegistry on every disconnect (see webmcp-bridge-mcp's
+    // wsServer.onDisconnect), but this service worker's own `tabs`/`activeTabId` state
+    // survives across reconnects. Without an explicit resync here, a server that starts
+    // (or restarts) *after* the extension already detected/installed tools on a tab would
+    // stay empty until some unrelated new browser event (tab switch, navigation, ...)
+    // happened to fire - which can be a long wait, and makes clicking "install" before the
+    // agent/server is up look like it silently did nothing.
+    void recomputeActiveTab(true);
+    void resyncKnownTabs();
   });
 
   ws.addEventListener("message", (event) => {
@@ -217,11 +228,44 @@ function upsertTabInfo(tabId: number, patch: Partial<Omit<TabInfo, "tabId">>): T
   return merged;
 }
 
+// Re-announces every tab we already know about to a freshly (re)connected server - see
+// the comment at the "open" handler in connect() for why this is necessary. Content
+// scripts keep their own per-tab manifest cache (see content.ts), so this is a cheap,
+// synchronous-on-the-page-side re-query rather than a live re-scan of the DOM.
+async function resyncKnownTabs(): Promise<void> {
+  for (const [tabId, info] of tabs) {
+    let tools: WebMcpToolManifest[];
+    try {
+      const message: BackgroundToContentMessage = { type: "webmcp/discover_request" };
+      const response = (await chrome.tabs.sendMessage(tabId, message)) as WebMcpDiscoverResponseMessage | undefined;
+      if (!response) continue;
+      tools = response.tools.map((tool) => stampTabId(tool, tabId));
+    } catch {
+      continue; // no content script here anymore (tab closed/navigated/chrome:// page) - drop it silently
+    }
+
+    upsertTabInfo(tabId, { toolsCount: tools.length });
+    sendEvent(info.installed ? "tab/webmcp_installed" : "tab/webmcp_detected", {
+      tabId,
+      url: info.url,
+      title: info.title,
+      origin: info.origin,
+      active: info.active,
+      installed: info.installed,
+      tools,
+    });
+  }
+}
+
 // "Active tab" = the active tab of the currently focused browser window.
-async function recomputeActiveTab(): Promise<void> {
+// `force` re-announces the active tab even if it's the same tabId we already had -
+// needed right after a (re)connect, since the server-side registry may have just been
+// wiped clean even though our local `activeTabId` didn't change.
+async function recomputeActiveTab(force = false): Promise<void> {
   try {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    if (!tab || tab.id === undefined || activeTabId === tab.id) return;
+    if (!tab || tab.id === undefined) return;
+    if (!force && activeTabId === tab.id) return;
 
     for (const [id, info] of tabs) {
       if (id !== tab.id && info.active) tabs.set(id, { ...info, active: false });
