@@ -75,6 +75,43 @@ test.describe("mixed imperative + declarative page", () => {
   });
 });
 
+test.describe("manual-confirm (no toolautosubmit) declarative tool", () => {
+  test("webmcp_call_tool returns pending, webmcp_submit_tool actually submits", async ({ context, mcpClient }) => {
+    const page = await context.newPage();
+    await page.goto(fixtureUrl("manual-confirm.html"));
+
+    await waitForExtensionConnected(mcpClient);
+    const tab = await waitForTab(mcpClient);
+
+    const discovered = textOf(await mcpClient.callTool({ name: "webmcp_discover_tools", arguments: { tabId: tab.tabId, forceRefresh: true } }));
+    const tool = discovered.tools.find((t: any) => t.id === "manual_echo");
+    expect(tool?.source).toBe("declarative");
+    expect(tool?.requiresUserGesture).toBe(true);
+
+    const callRaw = textOf(await mcpClient.callTool({ name: "webmcp_call_tool", arguments: { tabId: tab.tabId, toolId: "manual_echo", args: { word: "later" } } }));
+    expect(callRaw.ok).toBe(true);
+    expect(unwrap(callRaw.result)).toMatchObject({ pending: true });
+    await expect(page.locator('input[name="word"]')).toHaveValue("later");
+
+    const submitRaw = textOf(await mcpClient.callTool({ name: "webmcp_submit_tool", arguments: { tabId: tab.tabId, toolId: "manual_echo" } }));
+    expect(submitRaw.ok).toBe(true);
+    expect(unwrap(submitRaw.result)).toMatchObject({ ok: true, echo: "later" });
+  });
+
+  test("webmcp_submit_tool rejects a toolautosubmit form (nothing pending to confirm)", async ({ context, mcpClient }) => {
+    const page = await context.newPage();
+    await page.goto(fixtureUrl("declarative-only.html"));
+
+    await waitForExtensionConnected(mcpClient);
+    const tab = await waitForTab(mcpClient);
+    await mcpClient.callTool({ name: "webmcp_discover_tools", arguments: { tabId: tab.tabId, forceRefresh: true } });
+
+    const submitRaw = textOf(await mcpClient.callTool({ name: "webmcp_submit_tool", arguments: { tabId: tab.tabId, toolId: "decl_only" } }));
+    expect(submitRaw.ok).toBe(false);
+    expect(submitRaw.error).toMatch(/toolautosubmit/);
+  });
+});
+
 test.describe("dynamic tool add/remove interaction", () => {
   test("calling one tool reveals and hides other tools", async ({ context, mcpClient }) => {
     const page = await context.newPage();

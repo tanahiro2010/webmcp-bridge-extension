@@ -2,6 +2,7 @@ import type {
   ContentToInjectedMessage,
   InjectedCallResultMessage,
   InjectedManifestMessage,
+  InjectedSubmitResultMessage,
   ModelContext,
   ModelContextTool,
   WebMcpToolManifestDraft,
@@ -338,7 +339,10 @@ rescanForms();
 
 let CHANNEL: string | null = null;
 
-type OutgoingMessage = Omit<InjectedManifestMessage, "channel"> | Omit<InjectedCallResultMessage, "channel">;
+type OutgoingMessage =
+  | Omit<InjectedManifestMessage, "channel">
+  | Omit<InjectedCallResultMessage, "channel">
+  | Omit<InjectedSubmitResultMessage, "channel">;
 
 function postToContent(message: OutgoingMessage): void {
   if (!CHANNEL) return;
@@ -407,6 +411,36 @@ async function handleCall(requestId: string, toolId: string, args: Record<string
   postToContent({ source: "webmcp-injected", type: "webmcp/call_result", requestId, ok, result, error });
 }
 
+/**
+ * Explicitly submits a declarative tool that a prior handleCall() already filled and left
+ * pending (no toolautosubmit -> per spec, a real human click is required before it
+ * submits - see executeFormTool()). This is the deliberate override for that wait: an MCP
+ * client can call webmcp_submit_tool once it has decided to go ahead, instead of a human
+ * clicking the button. Only meaningful for declarative tools that are NOT toolautosubmit;
+ * anything else is rejected rather than silently no-op'd or double-submitted.
+ */
+async function handleSubmit(requestId: string, toolId: string): Promise<void> {
+  let ok = false;
+  let result: unknown;
+  let error: string | undefined;
+
+  try {
+    const form = findAnnotatedFormByName(toolId);
+    if (!form) {
+      throw new Error(`"${toolId}" is not a pending declarative WebMCP tool (no such tool, or it's imperative).`);
+    }
+    if (form.hasAttribute("toolautosubmit")) {
+      throw new Error(`"${toolId}" has toolautosubmit and already submits as part of webmcp_call_tool; there is nothing pending to confirm.`);
+    }
+    result = await submitFormAsAgent(form);
+    ok = true;
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+
+  postToContent({ source: "webmcp-injected", type: "webmcp/submit_result", requestId, ok, result, error });
+}
+
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   const data = event.data as ContentToInjectedMessage | undefined;
@@ -425,5 +459,9 @@ window.addEventListener("message", (event) => {
   if (data.type === "webmcp/call") {
     console.log("[webmcp:injected] <- webmcp/call", data.toolId);
     void handleCall(data.requestId, data.toolId, data.args);
+  }
+  if (data.type === "webmcp/submit") {
+    console.log("[webmcp:injected] <- webmcp/submit", data.toolId);
+    void handleSubmit(data.requestId, data.toolId);
   }
 });

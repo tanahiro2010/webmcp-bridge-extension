@@ -199,6 +199,22 @@ async function routeRequest(request: BridgeRequest): Promise<BridgeResponse> {
         return { kind: "response", id: request.id, ok: true, result };
       }
 
+      case "tool/submit": {
+        const params = request.params;
+        if (!isRecord(params) || typeof params.toolId !== "string") {
+          return errorResponse(request.id, "INVALID_PARAMS", "toolId is required.");
+        }
+        const tabId = resolveTabId(params.tabId);
+        if (tabId === undefined) {
+          return { kind: "response", id: request.id, ok: true, result: { ok: false, error: "No tabId given and no active tab is known yet." } };
+        }
+        const result = await sendToTab<WebMcpCallResponseMessage>(tabId, {
+          type: "webmcp/submit_request",
+          toolId: params.toolId,
+        });
+        return { kind: "response", id: request.id, ok: true, result };
+      }
+
       default:
         return errorResponse(request.id, "UNKNOWN_METHOD", `Unknown method: ${String(request.method)}`);
     }

@@ -99,7 +99,7 @@ export type TabInfo = {
 
 // ---- Bridge wire protocol (background.ts <-> webmcp-bridge-mcp over WebSocket) ----
 
-export type BridgeRequestMethod = "tabs/list" | "tab/discover_tools" | "tool/call" | "ping";
+export type BridgeRequestMethod = "tabs/list" | "tab/discover_tools" | "tool/call" | "tool/submit" | "ping";
 
 export type BridgeEventName =
   | "extension/hello"
@@ -170,8 +170,21 @@ export type WebMcpCallResponseMessage = {
   error?: string;
 };
 
+/**
+ * Confirms submission of a declarative tool that was previously filled via
+ * "webmcp/call_request" and came back pending (no toolautosubmit, so the spec requires an
+ * actual human click before it submits). This lets an MCP client explicitly override that
+ * wait instead of a human clicking the button - see the "webmcp_submit_tool" MCP tool.
+ * Has no effect on imperative tools or on toolautosubmit forms (those already submitted as
+ * part of the original call).
+ */
+export type WebMcpSubmitRequestMessage = {
+  type: "webmcp/submit_request";
+  toolId: string;
+};
+
 export type ContentToBackgroundMessage = WebMcpDetectedMessage | WebMcpInstallClickedMessage;
-export type BackgroundToContentMessage = WebMcpDiscoverRequestMessage | WebMcpCallRequestMessage;
+export type BackgroundToContentMessage = WebMcpDiscoverRequestMessage | WebMcpCallRequestMessage | WebMcpSubmitRequestMessage;
 
 // ---- window.postMessage protocol (content.ts <-> injected.ts, main<->isolated world) ----
 //
@@ -213,5 +226,23 @@ export type ContentCallMessage = {
   args?: Record<string, unknown>;
 };
 
-export type InjectedToContentMessage = InjectedManifestMessage | InjectedCallResultMessage;
-export type ContentToInjectedMessage = HandshakeMessage | ContentCallMessage;
+export type ContentSubmitMessage = {
+  channel: string;
+  source: "webmcp-content";
+  type: "webmcp/submit";
+  requestId: string;
+  toolId: string;
+};
+
+export type InjectedSubmitResultMessage = {
+  channel: string;
+  source: "webmcp-injected";
+  type: "webmcp/submit_result";
+  requestId: string;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+};
+
+export type InjectedToContentMessage = InjectedManifestMessage | InjectedCallResultMessage | InjectedSubmitResultMessage;
+export type ContentToInjectedMessage = HandshakeMessage | ContentCallMessage | ContentSubmitMessage;

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Manual Confirm Fixture</title>
+  </head>
+  <body>
+    <h1>Declarative tool WITHOUT toolautosubmit (requires webmcp_submit_tool or a human click)</h1>
+    <form toolname="manual_echo" tooldescription="Manual-confirm tool: echoes a word">
+      <input name="word" toolparamdescription="a word to echo" required />
+      <button type="submit">Go</button>
+    </form>
+    <script>
+      document.querySelector('form[toolname="manual_echo"]').addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (!event.agentInvoked) return;
+        const word = new FormData(event.target).get("word");
+        event.respondWith(Promise.resolve({ ok: true, echo: word }));
+      });
+    </script>
+  </body>
+</html>

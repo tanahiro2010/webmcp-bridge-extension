@@ -87,7 +87,11 @@ API に正規化されます）。
 
 - `toolautosubmit` 属性がある場合 → 拡張機能が自動で送信します
 - 無い場合 → 送信ボタンにフォーカスするだけで止まり、人間が内容を確認して手動送信する必要があります
-  （`webmcp_call_tool` はこの場合 `{ pending: true, ... }` を返し、実際の送信は待ちません）
+  （`webmcp_call_tool` はこの場合 `{ pending: true, ... }` を返し、実際の送信は待ちません）。
+  MCP クライアント側からこの「人間の確認」を明示的に上書きしたい場合は、
+  [webmcp-bridge-mcp の `webmcp_submit_tool`](../webmcp-bridge-mcp/README.md#利用できる-mcp-tools) を使います
+  （内部的には content.ts/injected.ts に `webmcp/submit_request` → `webmcp/submit` が飛び、
+  `toolautosubmit` の場合と同じ `submitFormAsAgent()` を直接呼び出します）。
 
 送信結果は仕様通り `SubmitEvent#respondWith()` で受け取ります。ページ側は次のように実装します。
 

@@ -1,6 +1,7 @@
 import type {
   BackgroundToContentMessage,
   ContentCallMessage,
+  ContentSubmitMessage,
   ContentToBackgroundMessage,
   HandshakeMessage,
   InjectedToContentMessage,
@@ -117,7 +118,7 @@ function handleInjectedMessage(event: MessageEvent): void {
     return;
   }
 
-  if (data.type === "webmcp/call_result") {
+  if (data.type === "webmcp/call_result" || data.type === "webmcp/submit_result") {
     const pending = pendingCalls.get(data.requestId);
     if (!pending) return;
     clearTimeout(pending.timer);
@@ -159,6 +160,26 @@ function callInjectedTool(toolId: string, args: Record<string, unknown> | undefi
   });
 }
 
+function submitInjectedTool(toolId: string): Promise<WebMcpCallResponseMessage> {
+  const requestId = crypto.randomUUID();
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingCalls.delete(requestId);
+      resolve({ ok: false, error: "TOOL_CALL_TIMEOUT" });
+    }, TOOL_CALL_TIMEOUT_MS);
+    pendingCalls.set(requestId, { resolve, timer });
+
+    const message: ContentSubmitMessage = {
+      channel: CHANNEL,
+      source: "webmcp-content",
+      type: "webmcp/submit",
+      requestId,
+      toolId,
+    };
+    window.postMessage(message, "*");
+  });
+}
+
 chrome.runtime.onMessage.addListener((message: BackgroundToContentMessage, _sender, sendResponse) => {
   if (message.type === "webmcp/discover_request") {
     const response: WebMcpDiscoverResponseMessage = { tools: cachedTools };
@@ -167,6 +188,10 @@ chrome.runtime.onMessage.addListener((message: BackgroundToContentMessage, _send
   }
   if (message.type === "webmcp/call_request") {
     callInjectedTool(message.toolId, message.args).then(sendResponse);
+    return true; // keep the message channel open for the async sendResponse
+  }
+  if (message.type === "webmcp/submit_request") {
+    submitInjectedTool(message.toolId).then(sendResponse);
     return true; // keep the message channel open for the async sendResponse
   }
   return false;
